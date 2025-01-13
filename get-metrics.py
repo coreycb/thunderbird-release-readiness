@@ -26,11 +26,11 @@ THUNDERBIRD_STATUS_VERSIONS = [
     "cf_status_thunderbird_133",
     "cf_status_thunderbird_134",
     "cf_status_thunderbird_135",
-    # "cf_status_thunderbird_136",
+    "cf_status_thunderbird_136",
 ]
 
 THUNDERBIRD_DAILY_VERSIONS = [
-    "135.0a1",
+    "136.0a1",
 ]
 
 THUNDERBIRD_BETA_VERSIONS = [
