@@ -40,6 +40,12 @@ THUNDERBIRD_BETA_VERSIONS = [
     "134.0b4",
     "134.0b5",
     "134.0b6",
+    "135.0b1",
+    "135.0b2",
+    "135.0b3",
+    "135.0b4",
+    "135.0b5",
+    "135.0b6",
 ]
 
 THUNDERBIRD_RELEASE_VERSIONS = [
