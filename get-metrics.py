@@ -96,7 +96,7 @@ def get_yesterday():
     return yesterday.strftime("%Y-%m-%d")
 
 
-def get_bmo_url(query_type):
+def get_bmo_url(query_type, rest_url=True):
     """Get bugzilla.mozilla.org URL"""
     index = 4
     f_version = ""
@@ -109,15 +109,22 @@ def get_bmo_url(query_type):
         index += 1
     f_version = f"{f_version}f{index}=CP&"
 
+    if rest_url:
+        url_base = (
+            "https://bugzilla.mozilla.org/rest/bug?include_fields=id,summary,status&"
+        )
+    else:
+        url_base = "https://bugzilla.mozilla.org/buglist.cgi?"
+
     url = (
-        "https://bugzilla.mozilla.org/rest/bug?include_fields=id,summary,status&"
+        f"{url_base}"
         "bug_type=defect&"
         "chfield=%5BBug%20creation%5D&"
         "f1=short_desc&"
         "f2=component&"
         "f3=OP&"
-        "j3=OR&"
         f"{f_version}"
+        "j3=OR&"
         f"{o_comparison}"
         "resolution=---&"
         "v1=intermit%20perma%20assert%20debug%20ews&"
@@ -198,7 +205,7 @@ def get_bmo_url(query_type):
     return url
 
 
-def get_csmo_url(query_type, date):
+def get_csmo_url(query_type):
     """Get crash-stats.mozilla.org URL"""
     versions = ""
     match query_type:
@@ -264,9 +271,9 @@ def stn_query(query_type):
     return count
 
 
-def csmo_query(query_type, crash_stats_date):
+def csmo_query(query_type):
     """Query crash-stats.mozilla.org"""
-    r = requests.get(get_csmo_url(query_type, crash_stats_date))
+    r = requests.get(get_csmo_url(query_type))
     count = json.loads(r.text)["total"]
     return count
 
@@ -299,19 +306,46 @@ def print_versions():
 
 def export_metrics_to_spreadsheet(release_readiness_metrics):
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-        df = pd.DataFrame(
-            [list(release_readiness_metrics.values())],
+        metrics_df = pd.DataFrame(
+            [list(metrics["count"] for metrics in release_readiness_metrics.values())],
             columns=list(release_readiness_metrics.keys()),
         )
-        df.insert(0, "Date", [get_today()])
+        metrics_df.insert(0, "Date", [get_today()])
+        url_df = pd.DataFrame(
+            [
+                (metrics["text"], metrics["url"])
+                for key, metrics in release_readiness_metrics.items()
+                if "url" in metrics
+            ],
+            columns=["Description", "URL"],
+        )
         with pd.ExcelWriter(temp_file.name, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Sheet1")
 
             workbook = writer.book
-            worksheet = writer.sheets["Sheet1"]
+
+            font = "Arial"
+            font_size = 10
+            header_format = workbook.add_format(
+                {"bg_color": "#B0B3B2", "align": "center"}
+            )
+            header_format.set_font_name(font)
+            header_format.set_font_size(font_size)
+            link_format = workbook.add_format({"font_color": "#0000FF", "underline": 1})
+            link_format.set_font_name(font)
+            link_format.set_font_size(font_size)
+            column_width = 50
+
+            sheet1 = workbook.add_worksheet("Release Metrics Charts")
+            sheet1.write(0, 0, "Query URLs", header_format)
+            for row_num, (
+                description,
+                url,
+            ) in enumerate(url_df.itertuples(index=False), start=1):
+                sheet1.write_url(row_num, 0, url, link_format, description)
+            sheet1.set_column(0, 0, column_width)
 
             font = "Helvetica Neue"
-            font_size = 10
+
             header_format = workbook.add_format(
                 {"bg_color": "#B0B3B2", "align": "center"}
             )
@@ -341,21 +375,22 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             last_column = "S"
             column_width = 12
 
-            for col_num, col_name in enumerate(df.columns):
-                worksheet.write(0, col_num, col_name, header_format)
-                worksheet.set_column(col_num, col_num, column_width, header_format)
+            metrics_df.to_excel(writer, index=False, sheet_name="Data from Queries")
+            sheet2 = writer.sheets["Data from Queries"]
+            for col_num, col_name in enumerate(metrics_df.columns):
+                sheet2.write(0, col_num, col_name, header_format)
+                sheet2.set_column(col_num, col_num, column_width, header_format)
             for column in percentage_columns:
-                worksheet.set_column(
-                    f"{column}:{column}", column_width, percentage_format
-                )
+                sheet2.set_column(f"{column}:{column}", column_width, percentage_format)
             for column in other_columns[
                 other_columns.index("A") : other_columns.index("A") + 1
             ]:
-                worksheet.set_column(f"{column}:{column}", column_width, date_format)
+                sheet2.set_column(f"{column}:{column}", column_width, date_format)
             for column in other_columns[
                 other_columns.index("B") : other_columns.index(last_column) + 1
             ]:
-                worksheet.set_column(f"{column}:{column}", column_width, other_format)
+                sheet2.set_column(f"{column}:{column}", column_width, other_format)
+
         try:
             subprocess.run(["xdg-open", temp_file.name], check=True)
         except Exception as e:
@@ -363,62 +398,64 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--crash-stats-date",
-        type=str,
-        default=None,
-        help="Optional date to use for crash stats query in YYYY-MM-DD format",
-    )
-    args = parser.parse_args()
+    def create_metrics_dict(keys_with_texts):
+        return {key: {"text": text} for key, text in keys_with_texts}
 
-    release_readiness_metrics = {
-        "regression-all": None,
-        "regression-severe": None,
-        "non-regression-all": None,
-        "non-regression-severe": None,
-        "topcrash": None,
-        "perf": None,
-        "sec-crit-high": None,
-        "sec-moderate-low": None,
-        "daily-installations": None,
-        "daily-crashes": None,
-        "daily-crash-rate": None,
-        "beta-installations": None,
-        "beta-crashes": None,
-        "beta-crash-rate": None,
-        "release-installations": None,
-        "release-crashes": None,
-        "release-crash-rate": None,
-        "total-installations": None,
-    }
-
-    for query_type in BMO_QUERY_TYPES:
-        count = bmo_query(query_type)
-        release_readiness_metrics[query_type] = count
-
-    for query_type in STN_QUERY_TYPES:
-        count = stn_query(query_type)
-        release_readiness_metrics[query_type] = count
-
-    for query_type in CSMO_QUERY_TYPES:
-        count = csmo_query(query_type, args.crash_stats_date)
-        release_readiness_metrics[query_type] = count
-
-    release_readiness_metrics["daily-crash-rate"] = (
-        release_readiness_metrics["daily-crashes"]
-        / release_readiness_metrics["daily-installations"]
-    )
-    release_readiness_metrics["beta-crash-rate"] = (
-        release_readiness_metrics["beta-crashes"]
-        / release_readiness_metrics["beta-installations"]
-    )
-    release_readiness_metrics["release-crash-rate"] = (
-        release_readiness_metrics["release-crashes"]
-        / release_readiness_metrics["release-installations"]
+    release_readiness_metrics = create_metrics_dict(
+        [
+            ("regression-all", "# of regressions (affecting 128+)"),
+            ("regression-severe", "# of severe (S1/S2) regressions (affecting 128+)"),
+            ("non-regression-all", "# of non-regressions (affecting 128+)"),
+            ("non-regression-severe", "# of severe (S1/S2) non-regressions (affecting 128+)"),
+            ("topcrash", "# of topcrash bugs (affecting 128+)"),
+            ("perf", "# of perf bugs (affecting 128+)"),
+            ("sec-crit-high", "# of sec-crit, sec-high bugs (affecting 128+)"),
+            ("sec-moderate-low", "# of sec-moderate, sec-low (affecting 128+)"),
+            ("daily-installations", None),
+            ("daily-crashes", "Daily crashes (last 24 hours)"),
+            ("daily-crash-rate", None),
+            ("beta-installations", None),
+            ("beta-crashes", "Beta crashes (last 24 hours)"),
+            ("beta-crash-rate", None),
+            ("release-installations", None),
+            ("release-crashes", "Release crashes (last 24 hours)"),
+            ("release-crash-rate", None),
+            ("total-installations", None),
+        ]
     )
 
     print_versions()
+
+    for query_type in BMO_QUERY_TYPES:
+        count = bmo_query(query_type)
+        release_readiness_metrics[query_type]["count"] = count
+
+    for query_type in STN_QUERY_TYPES:
+        count = stn_query(query_type)
+        release_readiness_metrics[query_type]["count"] = count
+
+    for query_type in CSMO_QUERY_TYPES:
+        count = csmo_query(query_type)
+        release_readiness_metrics[query_type]["count"] = count
+
+    release_readiness_metrics["daily-crash-rate"]["count"] = (
+        release_readiness_metrics["daily-crashes"]["count"]
+        / release_readiness_metrics["daily-installations"]["count"]
+    )
+    release_readiness_metrics["beta-crash-rate"]["count"] = (
+        release_readiness_metrics["beta-crashes"]["count"]
+        / release_readiness_metrics["beta-installations"]["count"]
+    )
+    release_readiness_metrics["release-crash-rate"]["count"] = (
+        release_readiness_metrics["release-crashes"]["count"]
+        / release_readiness_metrics["release-installations"]["count"]
+    )
+
+    for query_type in BMO_QUERY_TYPES:
+        release_readiness_metrics[query_type]["url"] = get_bmo_url(
+            query_type, rest_url=False
+        )
+
     export_metrics_to_spreadsheet(release_readiness_metrics)
 
 
