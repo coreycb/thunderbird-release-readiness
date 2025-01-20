@@ -11,49 +11,11 @@ import sys
 import tempfile
 
 from datetime import datetime, timedelta
+from functools import lru_cache
 from tabulate import tabulate
 
 import pandas as pd
 
-
-THUNDERBIRD_STATUS_VERSIONS = [
-    "cf_status_thunderbird_esr128",
-    "cf_status_thunderbird_128",
-    "cf_status_thunderbird_129",
-    "cf_status_thunderbird_130",
-    "cf_status_thunderbird_131",
-    "cf_status_thunderbird_132",
-    "cf_status_thunderbird_133",
-    "cf_status_thunderbird_134",
-    "cf_status_thunderbird_135",
-    "cf_status_thunderbird_136",
-]
-
-THUNDERBIRD_DAILY_VERSIONS = [
-    "136.0a1",
-]
-
-THUNDERBIRD_BETA_VERSIONS = [
-    "134.0b1",
-    "134.0b2",
-    "134.0b3",
-    "134.0b4",
-    "134.0b5",
-    "134.0b6",
-    "135.0b1",
-    "135.0b2",
-    "135.0b3",
-    "135.0b4",
-    "135.0b5",
-    "135.0b6",
-]
-
-THUNDERBIRD_RELEASE_VERSIONS = [
-    "133.0",
-    "133.0.1",
-    "133.0.2",
-    "133.0.3",
-]
 
 # bugzilla.mozilla.org
 BMO_QUERY_TYPES = [
@@ -83,26 +45,79 @@ CSMO_QUERY_TYPES = [
 ]
 
 
-def get_today():
+@lru_cache
+def current_thunderbird_versions():
+    url = "https://product-details.mozilla.org/1.0/thunderbird_versions.json"
+    response = requests.get(url)
+    data = response.json()
+    return data
+
+
+@lru_cache
+def thunderbird_status_versions():
+    thunderbird_versions = current_thunderbird_versions()
+    status_version_start = thunderbird_versions["THUNDERBIRD_ESR"].split(".")[0]
+    status_version_end = thunderbird_versions[
+        "LATEST_THUNDERBIRD_NIGHTLY_VERSION"
+    ].split(".")[0]
+    thunderbird_status_versions = [
+        f"cf_status_thunderbird_esr{status_version_start}"
+    ] + [
+        f"cf_status_thunderbird_{index}"
+        for index in range(int(status_version_start), int(status_version_end) + 1)
+    ]
+    return thunderbird_status_versions
+
+
+@lru_cache
+def thunderbird_daily_versions():
+    thunderbird_versions = current_thunderbird_versions()
+    thunderbird_daily_versions = [
+        thunderbird_versions["LATEST_THUNDERBIRD_NIGHTLY_VERSION"]
+    ]
+    return thunderbird_daily_versions
+
+
+@lru_cache
+def thunderbird_beta_versions():
+    thunderbird_versions = current_thunderbird_versions()
+    beta = thunderbird_versions["LATEST_THUNDERBIRD_DEVEL_VERSION"].split(".")[0]
+    thunderbird_beta_versions = [f"{beta}.0b{index}" for index in range(1, 7)]
+    return thunderbird_beta_versions
+
+
+@lru_cache
+def thunderbird_release_versions():
+    thunderbird_versions = current_thunderbird_versions()
+    release = thunderbird_versions["LATEST_THUNDERBIRD_VERSION"].split(".")[0]
+    thunderbird_release_versions = [f"{release}.0"] + [
+        f"{release}.0.{index}" for index in range(1, 4)
+    ]
+    return thunderbird_release_versions
+
+
+@lru_cache
+def today():
     """Get today's date in YYYY-MM-DD format"""
     today = datetime.now()
     return today.strftime("%Y-%m-%d")
 
 
-def get_yesterday():
+@lru_cache
+def yesterday():
     """Get yesterday's date in YYYY-MM-DD format"""
     today = datetime.now()
     yesterday = today - timedelta(days=1)
     return yesterday.strftime("%Y-%m-%d")
 
 
-def get_bmo_url(query_type, rest_url=True):
+def bmo_url(query_type, rest_url=True):
     """Get bugzilla.mozilla.org URL"""
     index = 4
     f_version = ""
     o_comparison = ""
     v_status = ""
-    for version in THUNDERBIRD_STATUS_VERSIONS:
+    for version in thunderbird_status_versions():
         f_version = f"{f_version}f{index}={version}&"
         o_comparison = f"{o_comparison}o{index}=equals&"
         v_status = f"{v_status}v{index}=affected&"
@@ -205,43 +220,36 @@ def get_bmo_url(query_type, rest_url=True):
     return url
 
 
-def get_csmo_url(query_type, rest_url=True):
+def csmo_url(query_type, rest_url=True):
     """Get crash-stats.mozilla.org URL"""
     versions = ""
     match query_type:
         case "daily-crashes":
-            for version in THUNDERBIRD_DAILY_VERSIONS:
+            for version in thunderbird_daily_versions():
                 versions = f"{versions}version={version}&"
         case "beta-crashes":
-            for version in THUNDERBIRD_BETA_VERSIONS:
+            for version in thunderbird_beta_versions():
                 versions = f"{versions}version={version}&"
         case "release-crashes":
-            for version in THUNDERBIRD_RELEASE_VERSIONS:
+            for version in thunderbird_release_versions():
                 versions = f"{versions}version={version}&"
 
-    today_formatted = get_today()
-    yesterday_formatted = get_yesterday()
+    today_formatted = today()
+    yesterday_formatted = yesterday()
     start_date = f"date=>={yesterday_formatted}T00:00:00.000Z&"
     end_date = f"date=<{today_formatted}T00:00:00.000Z&"
 
     if rest_url:
-        url_base = "https://crash-stats.mozilla.org/api/SuperSearch/?product=Thunderbird&"
+        url_base = (
+            "https://crash-stats.mozilla.org/api/SuperSearch/?product=Thunderbird&"
+        )
     else:
         url_base = "https://crash-stats.mozilla.org/search/?product=Thunderbird&"
 
-    url = (
-        f"{url_base}"
-        f"{versions}"
-        f"{start_date}"
-        f"{end_date}"
-        "_facets=platform&"
-    )
+    url = f"{url_base}" f"{versions}" f"{start_date}" f"{end_date}" "_facets=platform&"
 
     if rest_url:
-        url = (
-            f"{url}"
-            "_facets=release_channel"
-        )
+        url = f"{url}" "_facets=release_channel"
     else:
         url = (
             f"{url}"
@@ -265,7 +273,7 @@ def bmo_query(query_type):
     headers = {"Content-type": "application/json"}
     params = {"api_key": api_key}
 
-    r = requests.get(get_bmo_url(query_type), headers=headers, params=params)
+    r = requests.get(bmo_url(query_type), headers=headers, params=params)
     count = len(json.loads(r.text)["bugs"])
     return count
 
@@ -273,21 +281,20 @@ def bmo_query(query_type):
 def stn_query(query_type):
     """Query stats.thunderbird.net"""
     r = requests.get("https://stats.thunderbird.net/thunderbird_adi.json")
-    yesterday = get_yesterday()
     match query_type:
         case "total-installations":
-            count = json.loads(r.text)[yesterday]["count"]
+            count = json.loads(r.text)[yesterday()]["count"]
         case "daily-installations":
-            version = THUNDERBIRD_DAILY_VERSIONS[0]
-            count = json.loads(r.text)[yesterday]["versions"][version]
+            version = thunderbird_daily_versions()[0]
+            count = json.loads(r.text)[yesterday()]["versions"][version]
         case "beta-installations":
-            version = THUNDERBIRD_BETA_VERSIONS[0].split("b")[0]
-            count = json.loads(r.text)[yesterday]["versions"][version]
+            version = thunderbird_beta_versions()[0].split("b")[0]
+            count = json.loads(r.text)[yesterday()]["versions"][version]
         case "release-installations":
             count = 0
-            for version in THUNDERBIRD_RELEASE_VERSIONS:
-                if version in json.loads(r.text)[yesterday]["versions"]:
-                    count += json.loads(r.text)[yesterday]["versions"][version]
+            for version in thunderbird_release_versions():
+                if version in json.loads(r.text)[yesterday()]["versions"]:
+                    count += json.loads(r.text)[yesterday()]["versions"][version]
         case _:
             sys.exit(f"Unknown query type: {query_type}")
     return count
@@ -295,18 +302,18 @@ def stn_query(query_type):
 
 def csmo_query(query_type):
     """Query crash-stats.mozilla.org"""
-    r = requests.get(get_csmo_url(query_type))
+    r = requests.get(csmo_url(query_type))
     count = json.loads(r.text)["total"]
     return count
 
 
 def print_versions():
     affected_versions = re.sub(
-        "cf_status_thunderbird_", "", ", ".join(THUNDERBIRD_STATUS_VERSIONS)
+        "cf_status_thunderbird_", "", ", ".join(thunderbird_status_versions())
     )
-    daily_versions = f"{', '.join(THUNDERBIRD_DAILY_VERSIONS)}"
-    beta_versions = f"{', '.join(THUNDERBIRD_BETA_VERSIONS)}"
-    release_versions = f"{', '.join(THUNDERBIRD_RELEASE_VERSIONS)}"
+    daily_versions = f"{', '.join(thunderbird_daily_versions())}"
+    beta_versions = f"{', '.join(thunderbird_beta_versions())}"
+    release_versions = f"{', '.join(thunderbird_release_versions())}"
     table_data = {
         "Category": [
             "bugzilla affected versions",
@@ -332,7 +339,7 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             [list(metrics["count"] for metrics in release_readiness_metrics.values())],
             columns=list(release_readiness_metrics.keys()),
         )
-        metrics_df.insert(0, "Date", [get_today()])
+        metrics_df.insert(0, "Date", [today()])
         url_df = pd.DataFrame(
             [
                 (metrics["text"], metrics["url"])
@@ -345,6 +352,7 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
 
             workbook = writer.book
 
+            # formatting for sheet 1
             font = "Arial"
             font_size = 10
             header_format = workbook.add_format(
@@ -357,6 +365,7 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             link_format.set_font_size(font_size)
             column_width = 50
 
+            # write sheet 1
             sheet1 = workbook.add_worksheet("Release Metrics Charts")
             sheet1.write(0, 0, "Query URLs", header_format)
             for row_num, (
@@ -366,8 +375,8 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
                 sheet1.write_url(row_num, 0, url, link_format, description)
             sheet1.set_column(0, 0, column_width)
 
+            # formatting for sheet 2
             font = "Helvetica Neue"
-
             header_format = workbook.add_format(
                 {"bg_color": "#B0B3B2", "align": "center"}
             )
@@ -397,6 +406,7 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             last_column = "S"
             column_width = 12
 
+            # write sheet 2
             metrics_df.to_excel(writer, index=False, sheet_name="Data from Queries")
             sheet2 = writer.sheets["Data from Queries"]
             for col_num, col_name in enumerate(metrics_df.columns):
@@ -428,7 +438,10 @@ def main():
             ("regression-all", "# of regressions (affecting 128+)"),
             ("regression-severe", "# of severe (S1/S2) regressions (affecting 128+)"),
             ("non-regression-all", "# of non-regressions (affecting 128+)"),
-            ("non-regression-severe", "# of severe (S1/S2) non-regressions (affecting 128+)"),
+            (
+                "non-regression-severe",
+                "# of severe (S1/S2) non-regressions (affecting 128+)",
+            ),
             ("topcrash", "# of topcrash bugs (affecting 128+)"),
             ("perf", "# of perf bugs (affecting 128+)"),
             ("sec-crit-high", "# of sec-crit, sec-high bugs (affecting 128+)"),
@@ -474,14 +487,16 @@ def main():
     )
 
     for query_type in BMO_QUERY_TYPES:
-        release_readiness_metrics[query_type]["url"] = get_bmo_url(
+        release_readiness_metrics[query_type]["url"] = bmo_url(
             query_type, rest_url=False
         )
 
     for query_type in CSMO_QUERY_TYPES:
-        release_readiness_metrics[query_type]["url"] = get_csmo_url(
+        release_readiness_metrics[query_type]["url"] = csmo_url(
             query_type, rest_url=False
         )
+
+    export_metrics_to_spreadsheet(release_readiness_metrics)
 
 
 if __name__ == "__main__":
