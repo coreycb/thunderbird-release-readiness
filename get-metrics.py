@@ -205,7 +205,7 @@ def get_bmo_url(query_type, rest_url=True):
     return url
 
 
-def get_csmo_url(query_type):
+def get_csmo_url(query_type, rest_url=True):
     """Get crash-stats.mozilla.org URL"""
     versions = ""
     match query_type:
@@ -224,14 +224,36 @@ def get_csmo_url(query_type):
     start_date = f"date=>={yesterday_formatted}T00:00:00.000Z&"
     end_date = f"date=<{today_formatted}T00:00:00.000Z&"
 
+    if rest_url:
+        url_base = "https://crash-stats.mozilla.org/api/SuperSearch/?product=Thunderbird&"
+    else:
+        url_base = "https://crash-stats.mozilla.org/search/?product=Thunderbird&"
+
     url = (
-        "https://crash-stats.mozilla.org/api/SuperSearch/?product=Thunderbird&"
+        f"{url_base}"
         f"{versions}"
         f"{start_date}"
         f"{end_date}"
         "_facets=platform&"
-        "_facets=release_channel"
     )
+
+    if rest_url:
+        url = (
+            f"{url}"
+            "_facets=release_channel"
+        )
+    else:
+        url = (
+            f"{url}"
+            "_facets=release_channel&"
+            "_sort=-date&"
+            "_columns=date&"
+            "_columns=signature&"
+            "_columns=product&"
+            "_columns=version&"
+            "_columns=build_id&"
+            "_columns=platform#facet-release_channel"
+        )
     return url
 
 
@@ -456,7 +478,10 @@ def main():
             query_type, rest_url=False
         )
 
-    export_metrics_to_spreadsheet(release_readiness_metrics)
+    for query_type in CSMO_QUERY_TYPES:
+        release_readiness_metrics[query_type]["url"] = get_csmo_url(
+            query_type, rest_url=False
+        )
 
 
 if __name__ == "__main__":
