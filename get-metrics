@@ -12,9 +12,10 @@ import tempfile
 
 from datetime import datetime, timedelta
 from functools import lru_cache
-from tabulate import tabulate
 
 import pandas as pd
+
+from tabulate import tabulate
 
 
 # bugzilla.mozilla.org
@@ -397,13 +398,13 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             other_format.set_font_name(font)
             other_format.set_font_size(font_size)
 
-            percentage_columns = ["L", "O", "R"]
+            percentage_columns = ["L", "O", "R", "T", "U", "V"]
             other_columns = list(
                 filter(
                     lambda x: x not in percentage_columns, list(string.ascii_uppercase)
                 )
             )
-            last_column = "S"
+            last_other_column = "S"
             column_width = 12
 
             # write sheet 2
@@ -419,7 +420,7 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             ]:
                 sheet2.set_column(f"{column}:{column}", column_width, date_format)
             for column in other_columns[
-                other_columns.index("B") : other_columns.index(last_column) + 1
+                other_columns.index("B") : other_columns.index(last_other_column) + 1
             ]:
                 sheet2.set_column(f"{column}:{column}", column_width, other_format)
 
@@ -456,6 +457,9 @@ def main():
             ("release-crashes", "Release crashes (last 24 hours)"),
             ("release-crash-rate", None),
             ("total-installations", None),
+            ("daily-installations-%", None),
+            ("beta-installations-%", None),
+            ("release-installations-%", None),
         ]
     )
 
@@ -473,18 +477,15 @@ def main():
         count = csmo_query(query_type)
         release_readiness_metrics[query_type]["count"] = count
 
-    release_readiness_metrics["daily-crash-rate"]["count"] = (
-        release_readiness_metrics["daily-crashes"]["count"]
-        / release_readiness_metrics["daily-installations"]["count"]
-    )
-    release_readiness_metrics["beta-crash-rate"]["count"] = (
-        release_readiness_metrics["beta-crashes"]["count"]
-        / release_readiness_metrics["beta-installations"]["count"]
-    )
-    release_readiness_metrics["release-crash-rate"]["count"] = (
-        release_readiness_metrics["release-crashes"]["count"]
-        / release_readiness_metrics["release-installations"]["count"]
-    )
+    for channel in ["daily", "beta", "release"]:
+        release_readiness_metrics[f"{channel}-crash-rate"]["count"] = (
+            release_readiness_metrics[f"{channel}-crashes"]["count"]
+            / release_readiness_metrics[f"{channel}-installations"]["count"]
+        )
+        release_readiness_metrics[f"{channel}-installations-%"]["count"] = (
+            release_readiness_metrics[f"{channel}-installations"]["count"]
+            / release_readiness_metrics["total-installations"]["count"]
+        )
 
     for query_type in BMO_QUERY_TYPES:
         release_readiness_metrics[query_type]["url"] = bmo_url(
