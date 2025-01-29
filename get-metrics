@@ -45,6 +45,8 @@ CSMO_QUERY_TYPES = [
     "daily-crashes",
 ]
 
+INCLUDE_PREVIOUS_RELEASE = False
+
 
 @lru_cache
 def current_thunderbird_versions():
@@ -94,6 +96,11 @@ def thunderbird_release_versions():
     thunderbird_release_versions = [f"{release}.0"] + [
         f"{release}.0.{index}" for index in range(1, 4)
     ]
+    if INCLUDE_PREVIOUS_RELEASE:
+        previous_release = f"{int(release) - 1}"
+        thunderbird_release_versions = thunderbird_release_versions + [f"{previous_release}.0"] + [
+            f"{previous_release}.0.{index}" for index in range(1, 4)
+        ]
     return thunderbird_release_versions
 
 
@@ -430,9 +437,21 @@ def export_metrics_to_spreadsheet(release_readiness_metrics):
             print(f"Failed to open the file: {e}")
 
 
+def create_metrics_dict(keys_with_texts):
+    return {key: {"text": text} for key, text in keys_with_texts}
+
+
 def main():
-    def create_metrics_dict(keys_with_texts):
-        return {key: {"text": text} for key, text in keys_with_texts}
+    global INCLUDE_PREVIOUS_RELEASE
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-i",
+        "--include-previous-release",
+        action="store_true",
+        help="Include the previous Release channel version in addition to the current version",
+    )
+    args = parser.parse_args()
+    INCLUDE_PREVIOUS_RELEASE = args.include_previous_release
 
     release_readiness_metrics = create_metrics_dict(
         [
