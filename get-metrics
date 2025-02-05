@@ -45,6 +45,8 @@ CSMO_QUERY_TYPES = [
     "daily-crashes",
 ]
 
+INCLUDE_PREVIOUS_DAILY = False
+INCLUDE_PREVIOUS_BETA = False
 INCLUDE_PREVIOUS_RELEASE = False
 
 
@@ -75,9 +77,11 @@ def thunderbird_status_versions():
 @lru_cache
 def thunderbird_daily_versions():
     thunderbird_versions = current_thunderbird_versions()
-    thunderbird_daily_versions = [
-        thunderbird_versions["LATEST_THUNDERBIRD_NIGHTLY_VERSION"]
-    ]
+    daily = thunderbird_versions["LATEST_THUNDERBIRD_NIGHTLY_VERSION"]
+    thunderbird_daily_versions = [daily]
+    if INCLUDE_PREVIOUS_DAILY:
+        previous_daily = f"{int(daily.split('.')[0]) - 1}.0a1"
+        thunderbird_daily_versions = thunderbird_daily_versions + [f"{previous_daily}"]
     return thunderbird_daily_versions
 
 
@@ -86,6 +90,11 @@ def thunderbird_beta_versions():
     thunderbird_versions = current_thunderbird_versions()
     beta = thunderbird_versions["LATEST_THUNDERBIRD_DEVEL_VERSION"].split(".")[0]
     thunderbird_beta_versions = [f"{beta}.0b{index}" for index in range(1, 7)]
+    if INCLUDE_PREVIOUS_BETA:
+        previous_beta = f"{int(beta.split('.')[0]) - 1}"
+        thunderbird_beta_versions = thunderbird_beta_versions + [
+            f"{previous_beta}.0b{index}" for index in range(1, 7)
+        ]
     return thunderbird_beta_versions
 
 
@@ -293,8 +302,10 @@ def stn_query(query_type):
         case "total-installations":
             count = json.loads(r.text)[yesterday()]["count"]
         case "daily-installations":
-            version = thunderbird_daily_versions()[0]
-            count = json.loads(r.text)[yesterday()]["versions"][version]
+            count = 0
+            for version in thunderbird_daily_versions():
+                if version in json.loads(r.text)[yesterday()]["versions"]:
+                    count += json.loads(r.text)[yesterday()]["versions"][version]
         case "beta-installations":
             version = thunderbird_beta_versions()[0].split("b")[0]
             count = json.loads(r.text)[yesterday()]["versions"][version]
@@ -442,15 +453,31 @@ def create_metrics_dict(keys_with_texts):
 
 
 def main():
+    global INCLUDE_PREVIOUS_DAILY
+    global INCLUDE_PREVIOUS_BETA
     global INCLUDE_PREVIOUS_RELEASE
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-i",
+        "-id",
+        "--include-previous-daily",
+        action="store_true",
+        help="Include the previous Daily channel version in addition to the current version",
+    )
+    parser.add_argument(
+        "-ib",
+        "--include-previous-beta",
+        action="store_true",
+        help="Include the previous Beta channel version in addition to the current version",
+    )
+    parser.add_argument(
+        "-ir",
         "--include-previous-release",
         action="store_true",
         help="Include the previous Release channel version in addition to the current version",
     )
     args = parser.parse_args()
+    INCLUDE_PREVIOUS_DAILY = args.include_previous_daily
+    INCLUDE_PREVIOUS_BETA = args.include_previous_beta
     INCLUDE_PREVIOUS_RELEASE = args.include_previous_release
 
     release_readiness_metrics = create_metrics_dict(
