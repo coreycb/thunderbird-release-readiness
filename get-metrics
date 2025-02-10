@@ -32,10 +32,10 @@ BMO_QUERY_TYPES = [
 
 # stats.thunderbird.net
 STN_QUERY_TYPES = [
-    "daily-installations",
-    "beta-installations",
-    "release-installations",
-    "total-installations",
+    "daily-adi",
+    "beta-adi",
+    "release-adi",
+    "total-adi",
 ]
 
 # crash-stats.mozilla.org
@@ -299,17 +299,17 @@ def stn_query(query_type):
     """Query stats.thunderbird.net"""
     r = requests.get("https://stats.thunderbird.net/thunderbird_adi.json")
     match query_type:
-        case "total-installations":
+        case "total-adi":
             count = json.loads(r.text)[yesterday()]["count"]
-        case "daily-installations":
+        case "daily-adi":
             count = 0
             for version in thunderbird_daily_versions():
                 if version in json.loads(r.text)[yesterday()]["versions"]:
                     count += json.loads(r.text)[yesterday()]["versions"][version]
-        case "beta-installations":
+        case "beta-adi":
             version = thunderbird_beta_versions()[0].split("b")[0]
             count = json.loads(r.text)[yesterday()]["versions"][version]
-        case "release-installations":
+        case "release-adi":
             count = 0
             for version in thunderbird_release_versions():
                 if version in json.loads(r.text)[yesterday()]["versions"]:
@@ -493,19 +493,19 @@ def main():
             ("perf", "# of perf bugs (affecting 128+)"),
             ("sec-crit-high", "# of sec-crit, sec-high bugs (affecting 128+)"),
             ("sec-moderate-low", "# of sec-moderate, sec-low (affecting 128+)"),
-            ("daily-installations", None),
+            ("daily-adi", None),
             ("daily-crashes", "Daily crashes (last 24 hours)"),
             ("daily-crash-rate", None),
-            ("beta-installations", None),
+            ("beta-adi", None),
             ("beta-crashes", "Beta crashes (last 24 hours)"),
             ("beta-crash-rate", None),
-            ("release-installations", None),
+            ("release-adi", None),
             ("release-crashes", "Release crashes (last 24 hours)"),
             ("release-crash-rate", None),
-            ("total-installations", None),
-            ("daily-installations-%", None),
-            ("beta-installations-%", None),
-            ("release-installations-%", None),
+            ("total-adi", None),
+            ("daily-adi-%", None),
+            ("beta-adi-%", None),
+            ("release-adi-%", None),
         ]
     )
 
@@ -526,11 +526,11 @@ def main():
     for channel in ["daily", "beta", "release"]:
         release_readiness_metrics[f"{channel}-crash-rate"]["count"] = (
             release_readiness_metrics[f"{channel}-crashes"]["count"]
-            / release_readiness_metrics[f"{channel}-installations"]["count"]
+            / release_readiness_metrics[f"{channel}-adi"]["count"]
         )
-        release_readiness_metrics[f"{channel}-installations-%"]["count"] = (
-            release_readiness_metrics[f"{channel}-installations"]["count"]
-            / release_readiness_metrics["total-installations"]["count"]
+        release_readiness_metrics[f"{channel}-adi-%"]["count"] = (
+            release_readiness_metrics[f"{channel}-adi"]["count"]
+            / release_readiness_metrics["total-adi"]["count"]
         )
 
     for query_type in BMO_QUERY_TYPES:
