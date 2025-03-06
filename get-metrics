@@ -307,8 +307,13 @@ def stn_query(query_type):
                 if version in json.loads(r.text)[yesterday()]["versions"]:
                     count += json.loads(r.text)[yesterday()]["versions"][version]
         case "beta-adi":
-            version = thunderbird_beta_versions()[0].split("b")[0]
-            count = json.loads(r.text)[yesterday()]["versions"][version]
+            count = 0
+            for version in thunderbird_beta_versions():
+                if "0b1" not in version:
+                    continue
+                version = thunderbird_beta_versions()[0].split("b")[0]
+                if version in json.loads(r.text)[yesterday()]["versions"]:
+                    count += json.loads(r.text)[yesterday()]["versions"][version]
         case "release-adi":
             count = 0
             for version in thunderbird_release_versions():
