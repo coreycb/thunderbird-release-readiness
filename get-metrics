@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import cloudscraper
 import json
 import os
 import re
@@ -49,11 +50,12 @@ INCLUDE_PREVIOUS_DAILY = False
 INCLUDE_PREVIOUS_BETA = False
 INCLUDE_PREVIOUS_RELEASE = False
 
+scraper = cloudscraper.create_scraper()
 
 @lru_cache
 def current_thunderbird_versions():
     url = "https://product-details.mozilla.org/1.0/thunderbird_versions.json"
-    response = requests.get(url)
+    response = scraper.get(url)
     data = response.json()
     return data
 
@@ -290,14 +292,14 @@ def bmo_query(query_type):
     headers = {"Content-type": "application/json"}
     params = {"api_key": api_key}
 
-    r = requests.get(bmo_url(query_type), headers=headers, params=params)
+    r = scraper.get(bmo_url(query_type), headers=headers, params=params)
     count = len(json.loads(r.text)["bugs"])
     return count
 
 
 def stn_query(query_type):
     """Query stats.thunderbird.net"""
-    r = requests.get("https://stats.thunderbird.net/thunderbird_adi.json")
+    r = scraper.get("https://stats.thunderbird.net/thunderbird_adi.json")
     match query_type:
         case "total-adi":
             count = json.loads(r.text)[yesterday()]["count"]
@@ -326,7 +328,7 @@ def stn_query(query_type):
 
 def csmo_query(query_type):
     """Query crash-stats.mozilla.org"""
-    r = requests.get(csmo_url(query_type))
+    r = scraper.get(csmo_url(query_type))
     count = json.loads(r.text)["total"]
     return count
 
