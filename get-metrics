@@ -49,8 +49,10 @@ CSMO_QUERY_TYPES = [
 INCLUDE_PREVIOUS_DAILY = False
 INCLUDE_PREVIOUS_BETA = False
 INCLUDE_PREVIOUS_RELEASE = False
+ESR_NEXT = False
 
 scraper = cloudscraper.create_scraper()
+
 
 @lru_cache
 def current_thunderbird_versions():
@@ -61,9 +63,18 @@ def current_thunderbird_versions():
 
 
 @lru_cache
+def thunderbird_esr_major_version():
+    thunderbird_versions = current_thunderbird_versions()
+    version = thunderbird_versions["THUNDERBIRD_ESR"].split(".")[0]
+    if ESR_NEXT:
+        version = thunderbird_versions["THUNDERBIRD_ESR_NEXT"].split(".")[0]
+    return version
+
+
+@lru_cache
 def thunderbird_status_versions():
     thunderbird_versions = current_thunderbird_versions()
-    status_version_start = thunderbird_versions["THUNDERBIRD_ESR"].split(".")[0]
+    status_version_start = thunderbird_esr_major_version()
     status_version_end = thunderbird_versions[
         "LATEST_THUNDERBIRD_NIGHTLY_VERSION"
     ].split(".")[0]
@@ -109,9 +120,11 @@ def thunderbird_release_versions():
     ]
     if INCLUDE_PREVIOUS_RELEASE:
         previous_release = f"{int(release) - 1}"
-        thunderbird_release_versions = thunderbird_release_versions + [f"{previous_release}.0"] + [
-            f"{previous_release}.0.{index}" for index in range(1, 4)
-        ]
+        thunderbird_release_versions = (
+            thunderbird_release_versions
+            + [f"{previous_release}.0"]
+            + [f"{previous_release}.0.{index}" for index in range(1, 4)]
+        )
     return thunderbird_release_versions
 
 
@@ -463,6 +476,7 @@ def main():
     global INCLUDE_PREVIOUS_DAILY
     global INCLUDE_PREVIOUS_BETA
     global INCLUDE_PREVIOUS_RELEASE
+    global ESR_NEXT
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-id",
@@ -482,39 +496,44 @@ def main():
         action="store_true",
         help="Include the previous Release channel version in addition to the current version",
     )
+    parser.add_argument(
+        "-en",
+        "--esr-next",
+        action="store_true",
+        help="Gather data since THUNDERBIRD_ESR_NEXT instead of THUNDERBIRD_ESR",
+    )
     args = parser.parse_args()
     INCLUDE_PREVIOUS_DAILY = args.include_previous_daily
     INCLUDE_PREVIOUS_BETA = args.include_previous_beta
     INCLUDE_PREVIOUS_RELEASE = args.include_previous_release
+    ESR_NEXT = args.esr_next
 
-    release_readiness_metrics = create_metrics_dict(
-        [
-            ("regression-all", "# of regressions (affecting 128+)"),
-            ("regression-severe", "# of severe (S1/S2) regressions (affecting 128+)"),
-            ("non-regression-all", "# of non-regressions (affecting 128+)"),
-            (
-                "non-regression-severe",
-                "# of severe (S1/S2) non-regressions (affecting 128+)",
-            ),
-            ("topcrash", "# of topcrash bugs (affecting 128+)"),
-            ("perf", "# of perf bugs (affecting 128+)"),
-            ("sec-crit-high", "# of sec-crit, sec-high bugs (affecting 128+)"),
-            ("sec-moderate-low", "# of sec-moderate, sec-low (affecting 128+)"),
-            ("daily-adi", None),
-            ("daily-crashes", "Daily crashes (last 24 hours)"),
-            ("daily-crash-rate", None),
-            ("beta-adi", None),
-            ("beta-crashes", "Beta crashes (last 24 hours)"),
-            ("beta-crash-rate", None),
-            ("release-adi", None),
-            ("release-crashes", "Release crashes (last 24 hours)"),
-            ("release-crash-rate", None),
-            ("total-adi", None),
-            ("daily-adi-%", None),
-            ("beta-adi-%", None),
-            ("release-adi-%", None),
-        ]
-    )
+    esr_major_version = thunderbird_esr_major_version()
+    # fmt: off
+    release_readiness_metrics = create_metrics_dict([
+        ("regression-all", f"# of regressions (affecting {esr_major_version}+)"),
+        ("regression-severe", f"# of severe (S1/S2) regressions (affecting {esr_major_version}+)"),
+        ("non-regression-all", f"# of non-regressions (affecting {esr_major_version}+)"),
+        ("non-regression-severe", f"# of severe (S1/S2) non-regressions (affecting {esr_major_version}+)"),
+        ("sec-crit-high", f"# of sec-crit, sec-high bugs (affecting {esr_major_version}+)"),
+        ("sec-moderate-low", f"# of sec-moderate, sec-low (affecting {esr_major_version}+)"),
+        ("perf", f"# of perf bugs (affecting {esr_major_version}+)"),
+        ("topcrash", f"# of topcrash bugs (affecting {esr_major_version}+)"),
+        ("daily-adi", None),
+        ("daily-crashes", "Daily crashes (last 24 hours)"),
+        ("daily-crash-rate", None),
+        ("beta-adi", None),
+        ("beta-crashes", "Beta crashes (last 24 hours)"),
+        ("beta-crash-rate", None),
+        ("release-adi", None),
+        ("release-crashes", "Release crashes (last 24 hours)"),
+        ("release-crash-rate", None),
+        ("total-adi", None),
+        ("daily-adi-%", None),
+        ("beta-adi-%", None),
+        ("release-adi-%", None),
+    ])
+    # fmt: on
 
     print_versions()
 
