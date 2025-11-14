@@ -1,20 +1,25 @@
 # thunderbird-release-readiness
 Script used to gather data for release readiness metrics.
 
-## how to
-In order to run this script you will need to export a bugzilla.mozilla.org
-API key to the BMO_API_KEY environment variable.
+## pipx (recommended for isolated installs)
 
-### setup
-```
-python3 -m virtualenv .venv
-source .venv/bin/activate
-pip3 install -r requirements.txt
-export PATH=$PATH:.
+```bash
+# Install from the local project directory
+pipx install .
+
+# Or install directly from GitHub (replace with your repo URL if different)
+pipx install git+https://github.com/coreycb/thunderbird-release-readiness.git
+
+# Run the tool
+get-metrics --help
+
+# When running the actual queries, set your Bugzilla API key
 export BMO_API_KEY='<your API key>'
+get-metrics
 ```
 
-### execute
-```
-get-metrics
+To upgrade later:
+
+```bash
+pipx upgrade thunderbird-release-readiness
 ```

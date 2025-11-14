@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thunderbird-release-readiness"
+version = "1.0.0"
+description = "Thunderbird release readiness metrics collector"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    { name = "Corey Bryant", email = "corey@thunderbird.net" }
+]
+dependencies = [
+  "cloudscraper",
+  "pandas",
+  "requests",
+  "tabulate",
+  "xlsxwriter",
+  "openpyxl",
+]
+
+[project.scripts]
+get-metrics = "thunderbird_metrics.metrics_collector:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["thunderbird_metrics*"]

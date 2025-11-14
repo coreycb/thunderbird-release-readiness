@@ -129,16 +129,13 @@ def thunderbird_release_versions():
         # Include the specified number of previous releases
         for i in range(1, INCLUDE_PREVIOUS_RELEASES + 1):
             previous_release = int(release) - i
-            thunderbird_release_versions.extend(
-                [
-                    f"{previous_release}.0",
-                    f"{previous_release}.0.1",
-                    f"{previous_release}.0.2",
-                    f"{previous_release}.0.3",
-                ]
-            )
+            thunderbird_release_versions.extend([
+                f"{previous_release}.0",
+                f"{previous_release}.0.1",
+                f"{previous_release}.0.2",
+                f"{previous_release}.0.3"
+            ])
     return thunderbird_release_versions
-
 
 @lru_cache
 def thunderbird_current_daily_version():
@@ -163,7 +160,6 @@ def thunderbird_current_release_versions():
     release = thunderbird_versions["LATEST_THUNDERBIRD_VERSION"].split(".")[0]
     return [f"{release}.0"] + [f"{release}.0.{index}" for index in range(1, 4)]
 
-
 @lru_cache
 def thunderbird_current_esr140_versions():
     """Get only the current ESR 140 minor version (latest major.minor.x)"""
@@ -183,13 +179,10 @@ def thunderbird_current_esr140_versions():
 
     # Get the latest minor version
     if minor_versions:
-        latest_minor = max(
-            minor_versions.keys(), key=lambda x: tuple(map(int, x.split(".")))
-        )
+        latest_minor = max(minor_versions.keys(), key=lambda x: tuple(map(int, x.split("."))))
         return sorted(minor_versions[latest_minor])
 
     return []
-
 
 @lru_cache
 def thunderbird_esr_versions(major_version):
@@ -209,7 +202,7 @@ def thunderbird_esr_versions(major_version):
             parts = version.split(".")
             if len(parts) >= 2 and parts[0] == major_str:
                 # Filter out alpha/beta versions (those containing 'a' or 'b')
-                if "a" not in version and "b" not in version:
+                if 'a' not in version and 'b' not in version:
                     esr_versions.append(version)
 
     return sorted(esr_versions)
@@ -235,7 +228,7 @@ def thunderbird_esr_count(major_version):
 
         for version in versions_data.keys():
             # Check if it's a stable release (no 'a' or 'b')
-            if "a" not in version and "b" not in version:
+            if 'a' not in version and 'b' not in version:
                 try:
                     version_parts = version.split(".")
                     if len(version_parts) >= 2:
@@ -578,7 +571,7 @@ def print_versions():
             "daily versions",
             "beta versions",
             "release versions",
-            "esr140 versions",
+            "esr140 versions"
         ],
         "Variable": [
             affected_versions,
@@ -703,8 +696,8 @@ def main():
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
     logger = logging.getLogger(__name__)
 
@@ -799,24 +792,16 @@ def main():
 
         if query_type == "daily-adi":
             daily_versions = thunderbird_daily_versions()
-            logger.info(
-                f"STN {query_type}: {count:,} users across {len(daily_versions)} daily versions: {daily_versions}"
-            )
+            logger.info(f"STN {query_type}: {count:,} users across {len(daily_versions)} daily versions: {daily_versions}")
         elif query_type == "beta-adi":
             beta_versions = thunderbird_beta_versions()
-            logger.info(
-                f"STN {query_type}: {count:,} users across {len(beta_versions)} beta versions: {beta_versions}"
-            )
+            logger.info(f"STN {query_type}: {count:,} users across {len(beta_versions)} beta versions: {beta_versions}")
         elif query_type == "release-adi":
             release_versions = thunderbird_release_versions()
-            logger.info(
-                f"STN {query_type}: {count:,} users across {len(release_versions)} release versions: {release_versions}"
-            )
+            logger.info(f"STN {query_type}: {count:,} users across {len(release_versions)} release versions: {release_versions}")
         elif query_type == "esr140-adi":
             esr140_versions = thunderbird_esr_versions("140")
-            logger.info(
-                f"STN {query_type}: {count:,} users across {len(esr140_versions)} ESR 140 versions: {esr140_versions}"
-            )
+            logger.info(f"STN {query_type}: {count:,} users across {len(esr140_versions)} ESR 140 versions: {esr140_versions}")
         else:
             logger.info(f"STN {query_type}: {count:,} users")
 
@@ -828,9 +813,7 @@ def main():
 
         if query_type == "esr140-crashes":
             esr140_versions = thunderbird_current_esr140_versions()
-            logger.info(
-                f"CSMO {query_type}: {count} crashes from current ESR 140 versions: {esr140_versions}"
-            )
+            logger.info(f"CSMO {query_type}: {count} crashes from current ESR 140 versions: {esr140_versions}")
         else:
             logger.info(f"CSMO {query_type}: {count} crashes")
         logger.info(f"CSMO {query_type} URL: {csmo_url(query_type, rest_url=False)}")
@@ -842,9 +825,7 @@ def main():
         original_total = release_readiness_metrics["total-adi"]["count"]
         release_readiness_metrics["total-adi"]["count"] -= esr_115_count
         logger.info(f"ESR 115 and older users: {esr_115_count:,} (excluded from total)")
-        logger.info(
-            f"Total ADI: {original_total:,} -> {release_readiness_metrics['total-adi']['count']:,} (after excluding ESR 115)"
-        )
+        logger.info(f"Total ADI: {original_total:,} -> {release_readiness_metrics['total-adi']['count']:,} (after excluding ESR 115)")
     else:
         esr_115_count = thunderbird_esr_count("115")
         logger.info(f"ESR 115 and older users: {esr_115_count:,} (included in total)")
@@ -857,43 +838,31 @@ def main():
     current_daily_versions = thunderbird_current_daily_version()
     current_daily_adi = stn_current_query("current-daily-adi")
     current_daily_crashes = csmo_current_query("current-daily-crashes")
-    daily_crash_rate = (
-        current_daily_crashes / current_daily_adi if current_daily_adi > 0 else 0
-    )
+    daily_crash_rate = current_daily_crashes / current_daily_adi if current_daily_adi > 0 else 0
     logger.info(f"Daily versions: {current_daily_versions}")
     logger.info(f"Daily ADI (current): {current_daily_adi:,}")
     logger.info(f"Daily crashes (current): {current_daily_crashes:,}")
-    logger.info(
-        f"Daily crash rate (current): {daily_crash_rate:.6f} ({daily_crash_rate*100:.4f}%)"
-    )
+    logger.info(f"Daily crash rate (current): {daily_crash_rate:.6f} ({daily_crash_rate*100:.4f}%)")
 
     # Beta crash rate
     current_beta_versions = thunderbird_current_beta_versions()
     current_beta_adi = stn_current_query("current-beta-adi")
     current_beta_crashes = csmo_current_query("current-beta-crashes")
-    beta_crash_rate = (
-        current_beta_crashes / current_beta_adi if current_beta_adi > 0 else 0
-    )
+    beta_crash_rate = current_beta_crashes / current_beta_adi if current_beta_adi > 0 else 0
     logger.info(f"Beta versions: {current_beta_versions}")
     logger.info(f"Beta ADI (current): {current_beta_adi:,}")
     logger.info(f"Beta crashes (current): {current_beta_crashes:,}")
-    logger.info(
-        f"Beta crash rate (current): {beta_crash_rate:.6f} ({beta_crash_rate*100:.4f}%)"
-    )
+    logger.info(f"Beta crash rate (current): {beta_crash_rate:.6f} ({beta_crash_rate*100:.4f}%)")
 
     # Release crash rate
     current_release_versions = thunderbird_current_release_versions()
     current_release_adi = stn_current_query("current-release-adi")
     current_release_crashes = csmo_current_query("current-release-crashes")
-    release_crash_rate = (
-        current_release_crashes / current_release_adi if current_release_adi > 0 else 0
-    )
+    release_crash_rate = current_release_crashes / current_release_adi if current_release_adi > 0 else 0
     logger.info(f"Release versions: {current_release_versions}")
     logger.info(f"Release ADI (current): {current_release_adi:,}")
     logger.info(f"Release crashes (current): {current_release_crashes:,}")
-    logger.info(
-        f"Release crash rate (current): {release_crash_rate:.6f} ({release_crash_rate*100:.4f}%)"
-    )
+    logger.info(f"Release crash rate (current): {release_crash_rate:.6f} ({release_crash_rate*100:.4f}%)")
 
     # Update crash rates to use current version data
     release_readiness_metrics["daily-crash-rate"]["count"] = daily_crash_rate
@@ -907,9 +876,7 @@ def main():
         channel_adi = release_readiness_metrics[f"{channel}-adi"]["count"]
         percentage = channel_adi / total_adi
         release_readiness_metrics[f"{channel}-adi-%"]["count"] = percentage
-        logger.info(
-            f"{channel.capitalize()} ADI: {channel_adi:,} / {total_adi:,} = {percentage:.6f} ({percentage*100:.4f}%)"
-        )
+        logger.info(f"{channel.capitalize()} ADI: {channel_adi:,} / {total_adi:,} = {percentage:.6f} ({percentage*100:.4f}%)")
 
     logger.info("\n\n=== ESR Crash Rate and Percentage Calculations ===")
     for esr_version in ["140"]:
@@ -919,25 +886,20 @@ def main():
         current_esr140_crashes = csmo_current_esr140_query()
         esr_adi = release_readiness_metrics[f"esr{esr_version}-adi"]["count"]
 
-        esr_crash_rate = current_esr140_crashes / esr_adi if esr_adi > 0 else 0
+        esr_crash_rate = (
+            current_esr140_crashes / esr_adi
+            if esr_adi > 0 else 0
+        )
         esr_percentage = esr_adi / total_adi
 
         logger.info(f"ESR {esr_version} all versions: {all_esr_versions}")
         logger.info(f"ESR {esr_version} current minor versions: {current_esr_versions}")
         logger.info(f"ESR {esr_version} ADI (all versions): {esr_adi:,}")
-        logger.info(
-            f"ESR {esr_version} ADI percentage: {esr_percentage:.6f} ({esr_percentage*100:.4f}%)"
-        )
-        logger.info(
-            f"ESR {esr_version} crashes (current minor only): {current_esr140_crashes:,}"
-        )
-        logger.info(
-            f"ESR {esr_version} crash rate (current minor only): {esr_crash_rate:.6f} ({esr_crash_rate*100:.4f}%)"
-        )
+        logger.info(f"ESR {esr_version} ADI percentage: {esr_percentage:.6f} ({esr_percentage*100:.4f}%)")
+        logger.info(f"ESR {esr_version} crashes (current minor only): {current_esr140_crashes:,}")
+        logger.info(f"ESR {esr_version} crash rate (current minor only): {esr_crash_rate:.6f} ({esr_crash_rate*100:.4f}%)")
 
-        release_readiness_metrics[f"esr{esr_version}-crash-rate"][
-            "count"
-        ] = esr_crash_rate
+        release_readiness_metrics[f"esr{esr_version}-crash-rate"]["count"] = esr_crash_rate
         release_readiness_metrics[f"esr{esr_version}-adi-%"]["count"] = esr_percentage
 
     for query_type in BMO_QUERY_TYPES:
